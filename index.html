@@ -415,9 +415,13 @@ textarea {
                         </div>
                     </div>
                     <div class="flex items-center gap-3">
-                        <span class="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-800/80 rounded-lg text-xs font-medium border border-emerald-700">
-                            <i class="fa-solid fa-shield-halved text-emerald-300"></i> Operator Desa
-                        </span>
+                        <span
+    id="roleBadge"
+    class="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-800/80 rounded-lg text-xs font-medium border border-emerald-700"
+>
+    <i class="fa-solid fa-user-gear text-emerald-300"></i>
+    Operator Desa
+</span>
                         <button onclick="handleLogout()" class="px-4 py-2 bg-rose-600/90 hover:bg-rose-600 text-white rounded-xl text-xs font-semibold shadow transition flex items-center gap-2">
                             <i class="fa-solid fa-right-from-bracket"></i> Keluar
                         </button>
@@ -473,15 +477,34 @@ textarea {
                         <button onclick="openModal()" class="px-5 py-3 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl font-semibold shadow-lg shadow-emerald-700/10 transition flex items-center gap-2 text-sm">
                             <i class="fa-solid fa-plus-circle"></i> Tambah Data Pendataan Baru
                         </button>
-                        <div class="flex items-center gap-2">
-                            <button onclick="triggerBackup()" class="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition text-sm flex items-center gap-2">
-                                <i class="fa-solid fa-cloud-arrow-down text-emerald-600"></i> Backup
-                            </button>
-                            <label class="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition text-sm flex items-center gap-2 cursor-pointer">
-                                <i class="fa-solid fa-cloud-arrow-up text-blue-600"></i> Restore
-                                <input type="file" id="restoreFile" accept=".json" onchange="triggerRestore(event)" class="hidden">
-                            </label>
-                        </div>
+                       <!-- BACKUP & RESTORE - ADMINISTRATOR SAJA -->
+<div
+    id="adminBackupRestore"
+    class="flex items-center gap-2"
+>
+    <button
+        onclick="triggerBackup()"
+        class="px-4 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition text-sm flex items-center gap-2"
+    >
+        <i class="fa-solid fa-cloud-arrow-down text-emerald-600"></i>
+        Backup
+    </button>
+
+    <label
+        class="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition text-sm flex items-center gap-2 cursor-pointer"
+    >
+        <i class="fa-solid fa-cloud-arrow-up text-blue-600"></i>
+        Restore
+
+        <input
+            type="file"
+            id="restoreFile"
+            accept=".json"
+            onchange="triggerRestore(event)"
+            class="hidden"
+        >
+    </label>
+</div>
                     </div>
                     <div class="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-end">
                         <div class="relative flex-1 sm:w-72">
@@ -491,14 +514,27 @@ textarea {
                             <input type="text" id="searchInput" oninput="renderTable()" placeholder="Cari nama, nik, RT/RW, pemilik..." 
                                 class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:bg-white transition">
                         </div>
-                        <div class="flex items-center gap-2">
-                            <button onclick="downloadExcel()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold text-sm transition flex items-center gap-2 shadow-sm">
-                                <i class="fa-solid fa-file-excel"></i> Excel
-                            </button>
-                            <button onclick="downloadPDF()" class="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-semibold text-sm transition flex items-center gap-2 shadow-sm">
-                                <i class="fa-solid fa-file-pdf"></i> PDF
-                            </button>
-                        </div>
+                       <!-- EXPORT EXCEL & PDF - ADMINISTRATOR SAJA -->
+<div
+    id="adminExportButtons"
+    class="flex items-center gap-2"
+>
+    <button
+        onclick="downloadExcel()"
+        class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold text-sm transition flex items-center gap-2 shadow-sm"
+    >
+        <i class="fa-solid fa-file-excel"></i>
+        Excel
+    </button>
+
+    <button
+        onclick="downloadPDF()"
+        class="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-semibold text-sm transition flex items-center gap-2 shadow-sm"
+    >
+        <i class="fa-solid fa-file-pdf"></i>
+        PDF
+    </button>
+</div>
                     </div>
                 </div>
 
@@ -842,46 +878,395 @@ async function loadDataFromSupabase() {
     }
 }
 
-        // AUTHENTICATION
-        function checkSession() {
+      // ============================================
+// AUTHENTICATION
+// ============================================
 
-    const isAuth = sessionStorage.getItem('ramwetan_auth');
+// DAFTAR AKUN
+const APP_USERS = {
 
-    if (isAuth === 'true') {
+    administrator: {
+        username: 'Kliwon03',
+        password: 'Ramwet03',
+        role: 'administrator',
+        roleName: 'Administrator'
+    },
 
-        document.getElementById('loginView')
+    operator: {
+        username: 'Pemdesramwet',
+        password: '123456',
+        role: 'operator',
+        roleName: 'Operator Desa'
+    }
+
+};
+
+
+// ============================================
+// CEK SESSION
+// ============================================
+
+function checkSession() {
+
+    const isAuth =
+        sessionStorage.getItem('ramwetan_auth');
+
+    const role =
+        sessionStorage.getItem('ramwetan_role');
+
+    const username =
+        sessionStorage.getItem('ramwetan_username');
+
+
+    if (
+        isAuth === 'true' &&
+        role &&
+        username
+    ) {
+
+        document
+            .getElementById('loginView')
             .classList.add('hidden');
 
-        document.getElementById('mainDashboard')
+        document
+            .getElementById('mainDashboard')
             .classList.remove('hidden');
+
+
+        updateUserInterface(
+            username,
+            role
+        );
+
 
         loadDataFromSupabase();
 
     } else {
 
-        document.getElementById('loginView')
+        document
+            .getElementById('loginView')
             .classList.remove('hidden');
 
-        document.getElementById('mainDashboard')
+        document
+            .getElementById('mainDashboard')
             .classList.add('hidden');
+
     }
+
 }
 
-        function handleLogin(e) {
-            e.preventDefault();
-            const user = document.getElementById('loginUser').value.trim();
-            const pass = document.getElementById('loginPass').value.trim();
-            const errBox = document.getElementById('loginError');
 
-            if (user === 'Pemdesramwet' && pass === '123456') {
-                sessionStorage.setItem('ramwetan_auth', 'true');
-                errBox.classList.add('hidden');
-                showToast('Login Berhasil! Selamat datang di Portal Pemdes', 'success');
-                checkSession();
-            } else {
-                errBox.classList.remove('hidden');
-            }
+// ============================================
+// LOGIN
+// ============================================
+
+function handleLogin(e) {
+
+    e.preventDefault();
+
+
+    const user =
+        document
+            .getElementById('loginUser')
+            .value
+            .trim();
+
+    const pass =
+        document
+            .getElementById('loginPass')
+            .value
+            .trim();
+
+
+    const errBox =
+        document.getElementById('loginError');
+
+
+    let loginAccount = null;
+
+
+    // ADMINISTRATOR
+    if (
+        user === APP_USERS.administrator.username &&
+        pass === APP_USERS.administrator.password
+    ) {
+
+        loginAccount =
+            APP_USERS.administrator;
+
+    }
+
+
+    // OPERATOR DESA
+    else if (
+        user === APP_USERS.operator.username &&
+        pass === APP_USERS.operator.password
+    ) {
+
+        loginAccount =
+            APP_USERS.operator;
+
+    }
+
+
+    // LOGIN GAGAL
+    if (!loginAccount) {
+
+        errBox.classList.remove('hidden');
+
+        document
+            .getElementById('loginPass')
+            .value = '';
+
+        return;
+    }
+
+
+    // SIMPAN SESSION
+    sessionStorage.setItem(
+        'ramwetan_auth',
+        'true'
+    );
+
+    sessionStorage.setItem(
+        'ramwetan_username',
+        loginAccount.username
+    );
+
+    sessionStorage.setItem(
+        'ramwetan_role',
+        loginAccount.role
+    );
+
+    sessionStorage.setItem(
+        'ramwetan_role_name',
+        loginAccount.roleName
+    );
+
+
+    errBox.classList.add('hidden');
+
+
+    document
+        .getElementById('loginPass')
+        .value = '';
+
+
+    showToast(
+        'Login berhasil sebagai ' +
+        loginAccount.roleName,
+        'success'
+    );
+
+
+    checkSession();
+
+}
+
+
+// ============================================
+// TAMPILKAN INFORMASI USER
+// ============================================
+
+function updateUserInterface(
+    username,
+    role
+) {
+
+    const roleName =
+        role === 'administrator'
+            ? 'Administrator'
+            : 'Operator Desa';
+
+
+    const usernameElement =
+        document.getElementById(
+            'currentUsername'
+        );
+
+
+    const roleElement =
+        document.getElementById(
+            'currentRole'
+        );
+
+
+    if (usernameElement) {
+
+        usernameElement.innerText =
+            username;
+
+    }
+
+
+    if (roleElement) {
+
+        roleElement.innerText =
+            roleName;
+
+    }
+
+
+    const roleBadge =
+        document.getElementById(
+            'roleBadge'
+        );
+
+
+    if (roleBadge) {
+
+        if (role === 'administrator') {
+
+            roleBadge.innerHTML =
+                '<i class="fa-solid fa-user-shield"></i> Administrator';
+
+        } else {
+
+            roleBadge.innerHTML =
+                '<i class="fa-solid fa-user-gear"></i> Operator Desa';
+
         }
+
+    }
+
+}
+
+
+// ============================================
+// CEK ADMINISTRATOR
+// ============================================
+
+function isAdministrator() {
+
+    return (
+        sessionStorage.getItem(
+            'ramwetan_role'
+        ) === 'administrator'
+    );
+
+}
+
+
+// ============================================
+// CEK OPERATOR
+// ============================================
+
+function isOperator() {
+
+    return (
+        sessionStorage.getItem(
+            'ramwetan_role'
+        ) === 'operator'
+    );
+
+}
+// ============================================
+// ATUR HAK AKSES BERDASARKAN ROLE
+// ============================================
+
+function applyRolePermissions() {
+
+    const isAdmin =
+        isAdministrator();
+
+
+    // ========================================
+    // BACKUP & RESTORE
+    // ========================================
+
+    const backupRestore =
+        document.getElementById(
+            'adminBackupRestore'
+        );
+
+    if (backupRestore) {
+
+        if (isAdmin) {
+
+            backupRestore.classList.remove(
+                'hidden'
+            );
+
+        } else {
+
+            backupRestore.classList.add(
+                'hidden'
+            );
+
+        }
+    }
+
+
+    // ========================================
+    // EXCEL & PDF
+    // ========================================
+
+    const exportButtons =
+        document.getElementById(
+            'adminExportButtons'
+        );
+
+    if (exportButtons) {
+
+        if (isAdmin) {
+
+            exportButtons.classList.remove(
+                'hidden'
+            );
+
+        } else {
+
+            exportButtons.classList.add(
+                'hidden'
+            );
+
+        }
+    }
+
+}
+
+// ============================================
+// LOGOUT
+// ============================================
+
+function handleLogout() {
+
+    sessionStorage.removeItem(
+        'ramwetan_auth'
+    );
+
+    sessionStorage.removeItem(
+        'ramwetan_username'
+    );
+
+    sessionStorage.removeItem(
+        'ramwetan_role'
+    );
+
+    sessionStorage.removeItem(
+        'ramwetan_role_name'
+    );
+
+
+    document
+        .getElementById('loginUser')
+        .value = '';
+
+    document
+        .getElementById('loginPass')
+        .value = '';
+
+
+    checkSession();
+
+
+    showToast(
+        'Berhasil keluar dari sistem',
+        'info'
+    );
+
+}
+
 
         function togglePassword() {
             const passInput = document.getElementById('loginPass');
@@ -897,11 +1282,6 @@ async function loadDataFromSupabase() {
             }
         }
 
-        function handleLogout() {
-            sessionStorage.removeItem('ramwetan_auth');
-            checkSession();
-            showToast('Berhasil keluar dari sistem', 'info');
-        }
 
         // MODAL MANAGEMENT
         function openModal(index = -1) {
@@ -1747,7 +2127,18 @@ async function getSignedImageUrl(filePath) {
         }
 
         // BACKUP & RESTORE
-       function triggerBackup() {
+     function triggerBackup() {
+
+    if (!isAdministrator()) {
+
+        showToast(
+            'Akses ditolak. Backup hanya dapat dilakukan Administrator.',
+            'error'
+        );
+
+        return;
+    }
+
 
     if (!records || records.length === 0) {
 
@@ -2120,8 +2511,20 @@ async function getSignedImageUrl(filePath) {
 }
 
         // EXPORT EXCEL
-        function downloadExcel() {
-            if (records.length === 0) {
+       function downloadExcel() {
+
+    if (!isAdministrator()) {
+
+        showToast(
+            'Akses ditolak. Download Excel hanya dapat dilakukan Administrator.',
+            'error'
+        );
+
+        return;
+    }
+
+
+    if (records.length === 0) {
                 showToast('Tidak ada data untuk diexport!', 'info');
                 return;
             }
@@ -2149,6 +2552,17 @@ async function getSignedImageUrl(filePath) {
 
         // EXPORT PDF
         function downloadPDF() {
+
+    if (!isAdministrator()) {
+
+        showToast(
+            'Akses ditolak. Download PDF hanya dapat dilakukan Administrator.',
+            'error'
+        );
+
+        return;
+    }
+
             if (records.length === 0) {
                 showToast('Tidak ada data untuk diexport!', 'info');
                 return;
