@@ -975,7 +975,8 @@ setPreviewImage(
 
 async function uploadFileToSupabase(fileInputId, folder) {
 
-    const input = document.getElementById(fileInputId);
+    const input =
+        document.getElementById(fileInputId);
 
     if (!input || !input.files || !input.files[0]) {
         return null;
@@ -983,20 +984,28 @@ async function uploadFileToSupabase(fileInputId, folder) {
 
     const file = input.files[0];
 
-    // Batasi file
+    // ==========================================
+    // VALIDASI FILE
+    // ==========================================
+
     if (!file.type.startsWith('image/')) {
-        throw new Error('File harus berupa gambar.');
+        throw new Error(
+            `File ${fileInputId} harus berupa gambar.`
+        );
     }
 
-    // Maksimal 5 MB
     if (file.size > 5 * 1024 * 1024) {
-        throw new Error('Ukuran foto maksimal 5 MB.');
+        throw new Error(
+            `Ukuran ${fileInputId} maksimal 5 MB.`
+        );
     }
 
-    const extension = file.name
-        .split('.')
-        .pop()
-        .toLowerCase();
+    // ==========================================
+    // NAMA FILE
+    // ==========================================
+
+    const extension =
+        file.name.split('.').pop().toLowerCase();
 
     const fileName =
         `${Date.now()}_${crypto.randomUUID()}.${extension}`;
@@ -1004,22 +1013,49 @@ async function uploadFileToSupabase(fileInputId, folder) {
     const filePath =
         `${folder}/${fileName}`;
 
-    const { error } = await supabaseClient
-        .storage
-        .from('dokumen-kost')
-        .upload(filePath, file, {
-            cacheControl: '3600',
-            upsert: false,
-            contentType: file.type
-        });
+    // ==========================================
+    // UPLOAD
+    // ==========================================
+
+    const { error } =
+        await supabaseClient
+            .storage
+            .from('dokumen-kost')
+            .upload(
+                filePath,
+                file,
+                {
+                    cacheControl: '3600',
+                    upsert: false,
+                    contentType: file.type
+                }
+            );
 
     if (error) {
-        console.error('Upload Storage gagal:', error);
-        throw error;
+
+        console.error(
+            `Upload ${fileInputId} gagal:`,
+            error
+        );
+
+        if (
+            error.message &&
+            error.message.toLowerCase()
+                .includes('bucket not found')
+        ) {
+
+            throw new Error(
+                'Bucket Storage "dokumen-kost" tidak ditemukan. ' +
+                'Buat bucket dengan nama persis "dokumen-kost" ' +
+                'di Supabase → Storage → Buckets.'
+            );
+        }
+
+        throw new Error(
+            `Gagal upload ${fileInputId}: ${error.message}`
+        );
     }
 
-    // Yang disimpan ke database adalah PATH,
-    // bukan URL sementara.
     return filePath;
 }
 async function deleteStorageFile(filePath) {
