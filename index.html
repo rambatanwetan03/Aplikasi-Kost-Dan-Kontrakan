@@ -1610,55 +1610,142 @@ async function getSignedImageUrl(filePath) {
     return data.signedUrl;
 }
 
-    async function handleFormSubmit(e) {
+   async function handleFormSubmit(e) {
 
     e.preventDefault();
 
+    console.log('=== MULAI SIMPAN DATA ===');
+
     try {
 
-        const editIndex = parseInt(
-            document.getElementById('editIndex').value
+        // ==========================================
+        // AMBIL INDEX EDIT
+        // ==========================================
+
+        const editIndex =
+            parseInt(
+                document.getElementById('editIndex').value
+            );
+
+        console.log(
+            'Edit Index:',
+            editIndex
         );
+
+
+        // ==========================================
+        // AMBIL DATA FORM
+        // ==========================================
 
         const recordData = {
 
             jenisHunian:
-                document.getElementById('jenisHunian').value,
+                document.getElementById(
+                    'jenisHunian'
+                ).value,
 
             rt:
-                document.getElementById('rt').value,
+                document.getElementById(
+                    'rt'
+                ).value,
 
             rw:
-                document.getElementById('rw').value,
+                document.getElementById(
+                    'rw'
+                ).value,
 
             namaPenginap:
-                document.getElementById('namaPenginap').value,
+                document.getElementById(
+                    'namaPenginap'
+                ).value,
 
             nik:
-                document.getElementById('nik').value,
+                document.getElementById(
+                    'nik'
+                ).value,
 
             jumlahMenginap:
                 parseInt(
-                    document.getElementById('jumlahMenginap').value
+                    document.getElementById(
+                        'jumlahMenginap'
+                    ).value
                 ) || 1,
 
             durasiMenginap:
-                document.getElementById('durasiMenginap').value,
+                document.getElementById(
+                    'durasiMenginap'
+                ).value,
 
             alasan:
-                document.getElementById('alasan').value,
+                document.getElementById(
+                    'alasan'
+                ).value,
 
             namaPemilik:
-                document.getElementById('namaPemilik').value,
+                document.getElementById(
+                    'namaPemilik'
+                ).value,
 
             alamatPemilik:
-                document.getElementById('alamatPemilik').value
+                document.getElementById(
+                    'alamatPemilik'
+                ).value
+
         };
 
 
+        console.log(
+            'Data form:',
+            recordData
+        );
+
+
+        // ==========================================
+        // NOTIFIKASI MULAI
+        // ==========================================
+
         showToast(
-            'Menyimpan data dan foto...',
+            'Menyimpan data...',
             'info'
+        );
+
+
+        // ==========================================
+        // CEK LOGIN SUPABASE
+        // ==========================================
+
+        const {
+            data: sessionData,
+            error: sessionError
+        } =
+            await supabaseClient.auth.getSession();
+
+
+        if (sessionError) {
+
+            throw new Error(
+                'Gagal memeriksa sesi login: ' +
+                sessionError.message
+            );
+
+        }
+
+
+        if (
+            !sessionData ||
+            !sessionData.session
+        ) {
+
+            throw new Error(
+                'Sesi login Supabase tidak ditemukan. Silakan login kembali.'
+            );
+
+        }
+
+
+        console.log(
+            'Supabase Auth OK:',
+            sessionData.session.user.id
         );
 
 
@@ -1668,8 +1755,23 @@ async function getSignedImageUrl(filePath) {
 
         if (editIndex >= 0) {
 
+            console.log(
+                'Mode: EDIT'
+            );
+
+
             const oldRecord =
                 records[editIndex];
+
+
+            if (!oldRecord) {
+
+                throw new Error(
+                    'Data yang akan diedit tidak ditemukan.'
+                );
+
+            }
+
 
             const updateData = {
 
@@ -1705,12 +1807,15 @@ async function getSignedImageUrl(filePath) {
 
                 updated_at:
                     new Date().toISOString()
+
             };
 
 
-            // ======================================
-            // FOTO BARU
-            // ======================================
+            showToast(
+                'Memproses foto...',
+                'info'
+            );
+
 
             const fotoPenginapBaru =
                 await uploadFileToSupabase(
@@ -1718,17 +1823,20 @@ async function getSignedImageUrl(filePath) {
                     'penginap'
                 );
 
+
             const fotoKtpBaru =
                 await uploadFileToSupabase(
                     'fotoKtp',
                     'ktp'
                 );
 
+
             const fotoKkBaru =
                 await uploadFileToSupabase(
                     'fotoKk',
                     'kk'
                 );
+
 
             const fotoNikahBaru =
                 await uploadFileToSupabase(
@@ -1737,95 +1845,122 @@ async function getSignedImageUrl(filePath) {
                 );
 
 
-            // ======================================
-            // JIKA ADA FOTO BARU,
-            // UPDATE PATH DI DATABASE
-            // ======================================
-
             if (fotoPenginapBaru) {
+
                 updateData.foto_penginap =
                     fotoPenginapBaru;
+
             }
+
 
             if (fotoKtpBaru) {
+
                 updateData.foto_ktp =
                     fotoKtpBaru;
+
             }
+
 
             if (fotoKkBaru) {
+
                 updateData.foto_kk =
                     fotoKkBaru;
+
             }
+
 
             if (fotoNikahBaru) {
+
                 updateData.foto_nikah =
                     fotoNikahBaru;
+
             }
 
 
-            // ======================================
-            // UPDATE DATABASE
-            // ======================================
+            showToast(
+                'Menyimpan perubahan ke database...',
+                'info'
+            );
 
-            const { error } =
+
+            const {
+                error
+            } =
                 await supabaseClient
                     .from('data_kost')
                     .update(updateData)
-                    .eq('id', oldRecord.id);
+                    .eq(
+                        'id',
+                        oldRecord.id
+                    );
 
 
             if (error) {
-                throw error;
+
+                throw new Error(
+                    'Database menolak perubahan: ' +
+                    error.message
+                );
+
             }
 
 
-            // ======================================
-            // HAPUS FOTO LAMA JIKA DIGANTI
-            // ======================================
-
+            // Hapus foto lama jika diganti
             if (
                 fotoPenginapBaru &&
                 oldRecord.fotoPenginap
             ) {
+
                 await deleteStorageFile(
                     oldRecord.fotoPenginap
                 );
+
             }
+
 
             if (
                 fotoKtpBaru &&
                 oldRecord.fotoKtp
             ) {
+
                 await deleteStorageFile(
                     oldRecord.fotoKtp
                 );
+
             }
+
 
             if (
                 fotoKkBaru &&
                 oldRecord.fotoKk
             ) {
+
                 await deleteStorageFile(
                     oldRecord.fotoKk
                 );
+
             }
+
 
             if (
                 fotoNikahBaru &&
                 oldRecord.fotoNikah
             ) {
+
                 await deleteStorageFile(
                     oldRecord.fotoNikah
                 );
+
             }
 
 
             showToast(
-                'Data dan foto berhasil diperbarui!',
+                'Data berhasil diperbarui!',
                 'success'
             );
 
         }
+
 
         // ==========================================
         // MODE TAMBAH
@@ -1833,24 +1968,42 @@ async function getSignedImageUrl(filePath) {
 
         else {
 
+            console.log(
+                'Mode: TAMBAH'
+            );
+
+
+            showToast(
+                'Mengupload foto...',
+                'info'
+            );
+
+
+            // FOTO PENGINAP
             const fotoPenginap =
                 await uploadFileToSupabase(
                     'fotoPenginap',
                     'penginap'
                 );
 
+
+            // FOTO KTP
             const fotoKtp =
                 await uploadFileToSupabase(
                     'fotoKtp',
                     'ktp'
                 );
 
+
+            // FOTO KK
             const fotoKk =
                 await uploadFileToSupabase(
                     'fotoKk',
                     'kk'
                 );
 
+
+            // FOTO NIKAH
             const fotoNikah =
                 await uploadFileToSupabase(
                     'fotoNikah',
@@ -1858,7 +2011,25 @@ async function getSignedImageUrl(filePath) {
                 );
 
 
-            const { error } =
+            console.log(
+                'Upload foto selesai'
+            );
+
+
+            showToast(
+                'Menyimpan data ke database...',
+                'info'
+            );
+
+
+            // ======================================
+            // INSERT SUPABASE
+            // ======================================
+
+            const {
+                data,
+                error
+            } =
                 await supabaseClient
                     .from('data_kost')
                     .insert({
@@ -1904,11 +2075,25 @@ async function getSignedImageUrl(filePath) {
 
                         foto_nikah:
                             fotoNikah
-                    });
+
+                    })
+                    .select();
+
+
+            console.log(
+                'Hasil INSERT:',
+                data,
+                error
+            );
 
 
             if (error) {
-                throw error;
+
+                throw new Error(
+                    'Gagal menyimpan ke database: ' +
+                    error.message
+                );
+
             }
 
 
@@ -1916,26 +2101,60 @@ async function getSignedImageUrl(filePath) {
                 'Data dan foto berhasil disimpan!',
                 'success'
             );
+
         }
 
 
+        // ==========================================
+        // TUTUP MODAL
+        // ==========================================
+
         closeModal();
 
+
+        // ==========================================
+        // AMBIL DATA TERBARU
+        // ==========================================
+
+        showToast(
+            'Memuat data terbaru...',
+            'info'
+        );
+
+
         await loadDataFromSupabase();
+
+
+        console.log(
+            '=== SIMPAN SELESAI ==='
+        );
+
+
+        showToast(
+            'Data berhasil tersimpan dan dimuat!',
+            'success'
+        );
+
 
     } catch (error) {
 
         console.error(
-            'Gagal menyimpan:',
+            '=== ERROR SIMPAN DATA ===',
             error
         );
 
+
         showToast(
             'Gagal menyimpan: ' +
-            error.message,
+            (
+                error.message ||
+                'Kesalahan tidak diketahui'
+            ),
             'error'
         );
+
     }
+
 }
 
        async function deleteRecord(index) {
