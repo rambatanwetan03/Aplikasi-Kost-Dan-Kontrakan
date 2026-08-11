@@ -882,76 +882,84 @@ async function loadDataFromSupabase() {
 // AUTHENTICATION
 // ============================================
 
-// DAFTAR AKUN
-const APP_USERS = {
-
-    administrator: {
-        username: 'Kliwon03',
-        password: 'Ramwet03',
-        role: 'administrator',
-        roleName: 'Administrator'
-    },
-
-    operator: {
-        username: 'Pemdesramwet',
-        password: '123456',
-        role: 'operator',
-        roleName: 'Operator Desa'
-    }
-
-};
-
-
 // ============================================
 // CEK SESSION
 // ============================================
 
-function checkSession() {
+async function checkSession() {
 
-    const isAuth =
-        sessionStorage.getItem('ramwetan_auth');
-
-    const role =
-        sessionStorage.getItem('ramwetan_role');
-
-    const username =
-        sessionStorage.getItem('ramwetan_username');
+    const {
+        data,
+        error
+    } = await supabaseClient.auth.getSession();
 
 
     if (
-        isAuth === 'true' &&
-        role &&
-        username
+        error ||
+        !data.session
     ) {
 
         document
             .getElementById('loginView')
-            .classList.add('hidden');
-
-        document
-            .getElementById('mainDashboard')
-            .classList.remove('hidden');
-
-
-        updateUserInterface(
-            username,
-            role
-        );
-
-
-        loadDataFromSupabase();
-
-    } else {
-
-        document
-            .getElementById('loginView')
             .classList.remove('hidden');
 
         document
             .getElementById('mainDashboard')
             .classList.add('hidden');
 
+        return;
     }
+
+
+    const user =
+        data.session.user;
+
+
+    const {
+        data: profile,
+        error: profileError
+    } = await supabaseClient
+        .from('profiles')
+        .select('username, role')
+        .eq('id', user.id)
+        .single();
+
+
+    if (profileError) {
+
+        await supabaseClient.auth.signOut();
+
+        return;
+    }
+
+
+    sessionStorage.setItem(
+        'ramwetan_username',
+        profile.username
+    );
+
+    sessionStorage.setItem(
+        'ramwetan_role',
+        profile.role
+    );
+
+
+    document
+        .getElementById('loginView')
+        .classList.add('hidden');
+
+    document
+        .getElementById('mainDashboard')
+        .classList.remove('hidden');
+
+
+    updateUserInterface(
+        profile.username,
+        profile.role
+    );
+
+
+    await loadDataFromSupabase();
 
 }
 
@@ -960,10 +968,9 @@ function checkSession() {
 // LOGIN
 // ============================================
 
-function handleLogin(e) {
+async function handleLogin(e) {
 
     e.preventDefault();
-
 
     const user =
         document
@@ -977,40 +984,57 @@ function handleLogin(e) {
             .value
             .trim();
 
-
     const errBox =
         document.getElementById('loginError');
 
 
-    let loginAccount = null;
+    errBox.classList.add('hidden');
 
 
-    // ADMINISTRATOR
-    if (
-        user === APP_USERS.administrator.username &&
-        pass === APP_USERS.administrator.password
-    ) {
-
-        loginAccount =
-            APP_USERS.administrator;
-
-    }
+    // Username diubah menjadi email Auth
+    let email = '';
 
 
-    // OPERATOR DESA
-    else if (
-        user === APP_USERS.operator.username &&
-        pass === APP_USERS.operator.password
-    ) {
+    if (user === 'Kliwon03') {
 
-        loginAccount =
-            APP_USERS.operator;
+        email =
+            'kliwon03@rambatanwetan.desa.id';
 
     }
 
+    else if (user === 'Pemdesramwet') {
 
-    // LOGIN GAGAL
-    if (!loginAccount) {
+        email =
+            'pemdesramwet@rambatanwetan.desa.id';
+
+    }
+
+    else {
+
+        errBox.classList.remove('hidden');
+
+        return;
+    }
+
+
+    const {
+        data,
+        error
+    } = await supabaseClient.auth.signInWithPassword({
+
+        email: email,
+
+        password: pass
+
+    });
+
+
+    if (error) {
+
+        console.error(
+            'LOGIN ERROR:',
+            error
+        );
 
         errBox.classList.remove('hidden');
 
@@ -1022,39 +1046,55 @@ function handleLogin(e) {
     }
 
 
-    // SIMPAN SESSION
-    sessionStorage.setItem(
-        'ramwetan_auth',
-        'true'
-    );
+    // Ambil profil user
+    const {
+        data: profile,
+        error: profileError
+    } = await supabaseClient
+        .from('profiles')
+        .select('username, role')
+        .eq('id', data.user.id)
+        .single();
 
+
+    if (profileError) {
+
+        console.error(
+            'PROFILE ERROR:',
+            profileError
+        );
+
+        await supabaseClient.auth.signOut();
+
+        showToast(
+            'Profil pengguna belum terdaftar.',
+            'error'
+        );
+
+        return;
+    }
+
+
+    // Simpan hanya informasi tampilan,
+    // bukan password
     sessionStorage.setItem(
         'ramwetan_username',
-        loginAccount.username
+        profile.username
     );
 
     sessionStorage.setItem(
         'ramwetan_role',
-        loginAccount.role
+        profile.role
     );
-
-    sessionStorage.setItem(
-        'ramwetan_role_name',
-        loginAccount.roleName
-    );
-
-
-    errBox.classList.add('hidden');
-
-
-    document
-        .getElementById('loginPass')
-        .value = '';
 
 
     showToast(
         'Login berhasil sebagai ' +
-        loginAccount.roleName,
+        (
+            profile.role === 'administrator'
+                ? 'Administrator'
+                : 'Operator Desa'
+        ),
         'success'
     );
 
@@ -1229,11 +1269,28 @@ function applyRolePermissions() {
 // LOGOUT
 // ============================================
 
-function handleLogout() {
+async function handleLogout() {
 
-    sessionStorage.removeItem(
-        'ramwetan_auth'
-    );
+    const {
+        error
+    } = await supabaseClient.auth.signOut();
+
+
+    if (error) {
+
+        console.error(
+            'LOGOUT ERROR:',
+            error
+        );
+
+        showToast(
+            'Gagal keluar dari sistem.',
+            'error'
+        );
+
+        return;
+    }
+
 
     sessionStorage.removeItem(
         'ramwetan_username'
@@ -1241,10 +1298,6 @@ function handleLogout() {
 
     sessionStorage.removeItem(
         'ramwetan_role'
-    );
-
-    sessionStorage.removeItem(
-        'ramwetan_role_name'
     );
 
 
@@ -1257,7 +1310,13 @@ function handleLogout() {
         .value = '';
 
 
-    checkSession();
+    document
+        .getElementById('loginView')
+        .classList.remove('hidden');
+
+    document
+        .getElementById('mainDashboard')
+        .classList.add('hidden');
 
 
     showToast(
