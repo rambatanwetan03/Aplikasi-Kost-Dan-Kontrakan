@@ -719,7 +719,10 @@ async function loadDataFromSupabase() {
 
     try {
 
-        showToast('Mengambil data dari server...', 'info');
+        showToast(
+            'Mengambil data dari Supabase...',
+            'info'
+        );
 
         const { data, error } = await supabaseClient
             .from('data_kost')
@@ -729,78 +732,95 @@ async function loadDataFromSupabase() {
             });
 
         if (error) {
-            console.error('Error mengambil data:', error);
-
-            showToast(
-                'Gagal mengambil data dari Supabase',
-                'error'
+            console.error(
+                'Supabase SELECT ERROR:',
+                error
             );
 
-            return;
+            throw new Error(
+                error.message || 'Gagal mengambil data.'
+            );
         }
 
-       records = data.map(r => ({
-    id: r.id,
+        records = (data || []).map(r => ({
+            id: r.id,
 
-    jenisHunian: r.jenis_hunian,
-    rt: r.rt,
-    rw: r.rw,
+            jenisHunian: r.jenis_hunian || '',
+            rt: r.rt || '',
+            rw: r.rw || '',
 
-    namaPenginap: r.nama_penginap,
-    nik: r.nik,
-    jumlahMenginap: r.jumlah_menginap,
-    durasiMenginap: r.durasi_menginap,
-    alasan: r.alasan,
+            namaPenginap: r.nama_penginap || '',
+            nik: r.nik || '',
 
-    namaPemilik: r.nama_pemilik,
-    alamatPemilik: r.alamat_pemilik,
+            jumlahMenginap:
+                Number(r.jumlah_menginap) || 1,
 
-    // PATH STORAGE
-    fotoPenginap: r.foto_penginap,
-    fotoKtp: r.foto_ktp,
-    fotoKk: r.foto_kk,
-    fotoNikah: r.foto_nikah,
+            durasiMenginap:
+                r.durasi_menginap || '',
 
-    // URL UNTUK TAMPILAN
-    fotoPenginapUrl: null,
-    fotoKtpUrl: null,
-    fotoKkUrl: null,
-    fotoNikahUrl: null,
+            alasan:
+                r.alasan || '',
 
-    createdAt: r.created_at,
-    updatedAt: r.updated_at
-}));
+            namaPemilik:
+                r.nama_pemilik || '',
+
+            alamatPemilik:
+                r.alamat_pemilik || '',
+
+            fotoPenginap:
+                r.foto_penginap || null,
+
+            fotoKtp:
+                r.foto_ktp || null,
+
+            fotoKk:
+                r.foto_kk || null,
+
+            fotoNikah:
+                r.foto_nikah || null,
+
+            fotoPenginapUrl: null,
+            fotoKtpUrl: null,
+            fotoKkUrl: null,
+            fotoNikahUrl: null,
+
+            createdAt: r.created_at,
+            updatedAt: r.updated_at
+        }));
 
 
-// ============================================
-// BUAT SIGNED URL FOTO
-// ============================================
+        // ============================================
+        // BUAT SIGNED URL
+        // ============================================
 
-for (const record of records) {
+        await Promise.all(
+            records.map(async record => {
 
-    record.fotoPenginapUrl =
-        await getSignedImageUrl(
-            record.fotoPenginap
+                record.fotoPenginapUrl =
+                    await getSignedImageUrl(
+                        record.fotoPenginap
+                    );
+
+                record.fotoKtpUrl =
+                    await getSignedImageUrl(
+                        record.fotoKtp
+                    );
+
+                record.fotoKkUrl =
+                    await getSignedImageUrl(
+                        record.fotoKk
+                    );
+
+                record.fotoNikahUrl =
+                    await getSignedImageUrl(
+                        record.fotoNikah
+                    );
+
+            })
         );
 
-    record.fotoKtpUrl =
-        await getSignedImageUrl(
-            record.fotoKtp
-        );
 
-    record.fotoKkUrl =
-        await getSignedImageUrl(
-            record.fotoKk
-        );
-
-    record.fotoNikahUrl =
-        await getSignedImageUrl(
-            record.fotoNikah
-        );
-}
-
-
-renderTable();
+        renderTable();
 
         showToast(
             `${records.length} data berhasil dimuat`,
@@ -809,10 +829,14 @@ renderTable();
 
     } catch (error) {
 
-        console.error(error);
+        console.error(
+            'LOAD DATA ERROR:',
+            error
+        );
 
         showToast(
-            'Terjadi kesalahan saat mengambil data',
+            'Gagal memuat data: ' +
+            error.message,
             'error'
         );
     }
@@ -973,16 +997,24 @@ setPreviewImage(
             }
         }
 
-async function uploadFileToSupabase(fileInputId, folder) {
+async function uploadFileToSupabase(
+    fileInputId,
+    folder
+) {
 
     const input =
         document.getElementById(fileInputId);
 
-    if (!input || !input.files || !input.files[0]) {
+    if (
+        !input ||
+        !input.files ||
+        !input.files[0]
+    ) {
         return null;
     }
 
     const file = input.files[0];
+
 
     // ==========================================
     // VALIDASI FILE
@@ -990,74 +1022,91 @@ async function uploadFileToSupabase(fileInputId, folder) {
 
     if (!file.type.startsWith('image/')) {
         throw new Error(
-            `File ${fileInputId} harus berupa gambar.`
+            'File harus berupa gambar.'
         );
     }
 
-    if (file.size > 5 * 1024 * 1024) {
+
+    // Maksimal 5 MB
+    if (
+        file.size >
+        5 * 1024 * 1024
+    ) {
         throw new Error(
-            `Ukuran ${fileInputId} maksimal 5 MB.`
+            'Ukuran foto maksimal 5 MB.'
         );
     }
 
+
     // ==========================================
-    // NAMA FILE
+    // EXTENSION
     // ==========================================
 
-    const extension =
-        file.name.split('.').pop().toLowerCase();
+    let extension =
+        file.name
+            .split('.')
+            .pop()
+            .toLowerCase();
+
+
+    // ==========================================
+    // NAMA FILE UNIK
+    // ==========================================
 
     const fileName =
         `${Date.now()}_${crypto.randomUUID()}.${extension}`;
 
+
     const filePath =
         `${folder}/${fileName}`;
+
 
     // ==========================================
     // UPLOAD
     // ==========================================
 
-    const { error } =
-        await supabaseClient
-            .storage
-            .from('dokumen-kost')
-            .upload(
-                filePath,
-                file,
-                {
-                    cacheControl: '3600',
-                    upsert: false,
-                    contentType: file.type
-                }
-            );
+    const {
+        data,
+        error
+    } = await supabaseClient
+        .storage
+        .from('dokumen-kost')
+        .upload(
+            filePath,
+            file,
+            {
+                cacheControl: '3600',
+                upsert: false,
+                contentType: file.type
+            }
+        );
+
 
     if (error) {
 
         console.error(
-            `Upload ${fileInputId} gagal:`,
+            'SUPABASE STORAGE ERROR:',
             error
         );
 
-        if (
-            error.message &&
-            error.message.toLowerCase()
-                .includes('bucket not found')
-        ) {
-
-            throw new Error(
-                'Bucket Storage "dokumen-kost" tidak ditemukan. ' +
-                'Buat bucket dengan nama persis "dokumen-kost" ' +
-                'di Supabase → Storage → Buckets.'
-            );
-        }
-
         throw new Error(
-            `Gagal upload ${fileInputId}: ${error.message}`
+            'Upload foto gagal: ' +
+            error.message
         );
     }
 
+
+    console.log(
+        'File berhasil diupload:',
+        filePath
+    );
+
+
+    // Yang disimpan di database:
+    // PATH FILE
     return filePath;
 }
+
 async function deleteStorageFile(filePath) {
 
     if (!filePath) {
